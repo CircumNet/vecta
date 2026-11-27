@@ -1,0 +1,5 @@
+first_name,last_name,email,department,job_title,staff_id,department_head
+Chidi,Obi,chidi.obi@university.edu.ng,Academic: Engineering,Head of Engineering,E001,yes
+Amaka,Nwosu,amaka.nwosu@university.edu.ng,Academic: Engineering,Team Lead,E002,
+Tunde,Bello,tunde.bello@university.edu.ng,Academic: Engineering,Software Engineer,E003,
+Ngozi,Eze,ngozi.eze@university.edu.ng,Non-academic: Human Resources,HR Manager,H001,

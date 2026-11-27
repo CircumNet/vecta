@@ -1,0 +1,34 @@
+import { $, text, set, click, sleep, check, until, ymd, askOk } from "./lib.mjs";
+export default async function () {
+  location.hash = "#/apply"; await until(() => $("#lf"));
+  const study = [...$("#leave_type").options].find((o) => o.textContent === "Study");
+  set("#leave_type", study.value);
+  const a = ymd(45), b = new Date(a + "T00:00:00"); b.setDate(b.getDate() + 1);
+  set("#start_date", a); set("#end_date", `${b.getFullYear()}-${String(b.getMonth() + 1).padStart(2, "0")}-${String(b.getDate()).padStart(2, "0")}`);
+  await until(() => /All checks passed/.test(text()), 5000);
+  check("apply: live preview shows 2 working days and passes", /2\s*working days/.test(text()) && /All checks passed/.test(text()), text().slice(0, 400));
+  check("apply: submit button enabled", !$("#submit").disabled);
+  set("#end_date", a); set("#day_part", "morning");
+  await until(() => /0\.5\s*working day/.test(text()), 4000);
+  check("apply: half-day preview = 0.5 day", /0\.5\s*working day/.test(text()), text().slice(0, 300));
+  set("#end_date", a); set("#day_part", "full"); set("#start_date", ymd(-3, false));
+  await until(() => /cannot be in the past/.test(text()), 4000);
+  check("apply: past date is rejected live", /cannot be in the past/.test(text()) && $("#submit").disabled);
+  set("#start_date", a); set("#end_date", a); set("#day_part", "full"); set("#reason", "Exam week");
+  await until(() => !$("#submit").disabled, 4000);
+  click("#submit");
+  check("apply: submit lands on request detail", await until(() => /#\/leave\/\d+/.test(location.hash) && /Pending/.test(text()), 5000), location.hash);
+  check("detail: shows history entry 'submitted the request'", /submitted the request/.test(text()));
+  check("detail: shows requester's own Cancel button", !!$('[data-act="cancel"]'));
+  click('[data-act="cancel"]'); await askOk("changed plans");
+  check("detail: cancelling updates status", await until(() => /Cancelled/.test(text()) && !$('[data-act="cancel"]'), 5000));
+  location.hash = "#/leave"; await until(() => $("#chips") && $("#out table"));
+  check("my leave: lists requests with Cancelled badge", /Cancelled/.test(text()));
+  click('[data-s="approved"]'); await sleep(500);
+  check("my leave: status filter works", !/Cancelled/.test($("#out").textContent));
+  location.hash = "#/calendar"; await until(() => $(".cal .day"));
+  check("calendar: renders 42 day cells", document.querySelectorAll(".cal .day").length === 42);
+  click("#next"); await sleep(600); check("calendar: next month navigates", document.querySelectorAll(".cal .day").length === 42);
+  click(".cal .day"); check("calendar: clicking a day opens a modal", await until(() => $(".modal"), 2000)); click(".modal [data-close]");
+  click("#bell"); check("notifications: bell opens dropdown", await until(() => $(".pop .pop-h"), 3000));
+}

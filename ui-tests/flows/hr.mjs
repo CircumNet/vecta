@@ -1,0 +1,31 @@
+import { $, text, set, click, sleep, check, until, askOk } from "./lib.mjs";
+export default async function () {
+  location.hash = "#/hr/requests?reviewed=false"; await until(() => $("[data-review]"));
+  check("hr: deep link filters to awaiting review", $("#f_reviewed").value === "false");
+  const n = document.querySelectorAll("[data-review]").length;
+  click($("[data-review]")); await askOk("Verified");
+  check("hr: review from the list works", await until(() => document.querySelectorAll("[data-review]").length === n - 1, 5000));
+  set("#f_status", "pending"); await sleep(700);
+  check("hr: status filter narrows the list", !/Approved|Rejected/.test($("#out").textContent) || document.querySelectorAll("tbody tr").length > 0);
+  location.hash = "#/hr/reports"; await until(() => /Working days/.test(text()));
+  check("reports: KPIs and charts render", /Requests/.test(text()) && !!$(".chart") && !!$(".donut-wrap"));
+  click('[data-p="month"]'); await sleep(900); check("reports: preset switches range", /Requests/.test(text()));
+  location.hash = "#/hr/people"; await until(() => $("#add-user"));
+  click("#add-user"); await until(() => $(".modal form"));
+  set(".modal [name=first_name]", "Test"); set(".modal [name=last_name]", "Person"); set(".modal [name=username]", "t.person"); set(".modal [name=email]", "t.person@example.com");
+  const dept = $(".modal [name=department]"); set(".modal [name=department]", dept.options[1].value);
+  click(".modal [data-submit]");
+  check("people: creating a user shows a one-time temporary password", await until(() => $("#tp"), 6000));
+  globalThis.__tmp = $("#tp").value; click(".modal [data-close]");
+  check("people: new user appears in the table", await until(() => /Test Person/.test(text()), 4000));
+  click('[data-tab="depts"]'); check("people: departments tab", await until(() => /Department/.test(text()) && $("#add-dept"), 3000));
+  location.hash = "#/hr/policies"; await until(() => $("[data-new]")); click("[data-new]"); await until(() => $(".modal form"));
+  set(".modal [name=name]", "Test leave"); set(".modal [name=default_days]", "7"); click(".modal [data-submit]");
+  check("policies: add a leave type", await until(() => /Test leave/.test(text()), 5000));
+  click('[data-tab="blackouts"]'); await until(() => /Staff cannot request leave that overlaps/.test(text())); click("[data-new]"); await until(() => $(".modal form"));
+  set(".modal [name=name]", "Exams"); set(".modal [name=start_date]", "2027-01-11"); set(".modal [name=end_date]", "2027-01-15"); click(".modal [data-submit]");
+  check("policies: add a blackout period", await until(() => /Exams/.test(text()), 5000));
+  location.hash = "#/hr/audit"; check("audit: log lists actions", await until(() => /Approved|Submitted|Reviewed/.test(text()), 4000));
+  const r = await globalThis.__h.realFetch(globalThis.__h.BASE + "/api/auth/login/", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: "t.person", password: globalThis.__tmp }) });
+  check("people: temporary password actually works for login", r.status === 200);
+}

@@ -1,0 +1,7 @@
+{
+  "name": "vecta-ui-tests",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "bash run.sh" },
+  "devDependencies": { "jsdom": "^26.0.0" }
+}

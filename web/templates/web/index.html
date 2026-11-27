@@ -1,0 +1,18 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Vecta</title>
+  <link rel="icon" type="image/svg+xml" href="{% static 'web/logo.svg' %}">
+  <link rel="stylesheet" href="{% static 'web/css/app.css' %}">
+  <script>try{var t=localStorage.getItem('lms.theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="toasts" aria-live="polite"></div>
+  <noscript>This application needs JavaScript.</noscript>
+  <script type="module" src="{% static 'web/js/app.js' %}"></script>
+</body>
+</html>

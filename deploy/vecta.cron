@@ -1,0 +1,7 @@
+# /etc/cron.d/vecta  -- scheduled jobs and nightly backup. Adjust paths if you installed elsewhere.
+SHELL=/bin/bash
+APP=cd /srv/vecta/app && set -a && . /etc/vecta.env && set +a && /srv/vecta/venv/bin/python manage.py
+15 6 * * *  vecta  $APP remind_pending --days 3 --escalate-after 7
+25 6 * * *  vecta  $APP prune_pending --days 3
+0  5 2 1 *  vecta  $APP init_balances
+30 2 * * *  postgres  pg_dump vecta | gzip > /var/backups/vecta/db-$(date +\%F).sql.gz && find /var/backups/vecta -name 'db-*.sql.gz' -mtime +30 -delete
