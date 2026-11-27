@@ -20,19 +20,48 @@ LEAVE_TYPES = [  # name, days, doc, paid, carry, notice, max_consecutive, ignore
     ("Compassionate", 5, False, True, 0, 0, 5, True),
     ("Unpaid", 30, False, False, 0, 14, 20, False),
 ]
+
 HOLIDAYS = {(1, 1): "New Year's Day", (5, 1): "Workers' Day", (6, 12): "Democracy Day",
             (10, 1): "Independence Day", (12, 25): "Christmas Day", (12, 26): "Boxing Day"}
+
+# --- ALL DEPARTMENTS FROM FRONTEND ---
+ACADEMIC_DEPTS = [
+    "Accounting", 
+    "Banking and Finance", 
+    "Biochemistry", 
+    "Business Admin", 
+    "Computer Science", 
+    "Cybersecurity", 
+    "Data Science", 
+    "Economics", 
+    "Law", 
+    "Mass Communication", 
+    "Microbiology", 
+    "Nursing", 
+    "Philosophy", 
+    "Public Admin", 
+    "Religious Studies"
+]
+
+NON_ACADEMIC_DEPTS = [
+    "Admin", 
+    "Bursary", 
+    "Human Resources", 
+    "Works"
+]
+
+# Demo users assigned to some of the real departments
 USERS = [  # username, first, last, dept, title
-    ("head.eng", "Chidi", "Obi", "Engineering", "Head of Engineering"),
-    ("staff1", "Tunde", "Bello", "Engineering", "Software Engineer"),
-    ("staff2", "Zainab", "Musa", "Engineering", "QA Engineer"),
-    ("staff3", "Ifeanyi", "Okafor", "Engineering", "DevOps Engineer"),
-    ("head.fin", "Bola", "Adeyemi", "Finance", "Head of Finance"),
-    ("staff4", "Kemi", "Lawal", "Finance", "Accountant"),
-    ("staff5", "Emeka", "Eze", "Finance", "Payroll Officer"),
-    ("head.ops", "Yusuf", "Danjuma", "Operations", "Head of Operations"),
-    ("staff6", "Funke", "Adebayo", "Operations", "Logistics Officer"),
-    ("staff7", "Segun", "Balogun", "Operations", "Facilities Officer"),
+    ("head.eng", "Chidi", "Obi", "Computer Science", "Head of Computer Science"),
+    ("staff1", "Tunde", "Bello", "Computer Science", "Software Engineer"),
+    ("staff2", "Zainab", "Musa", "Cybersecurity", "QA Engineer"),
+    ("staff3", "Ifeanyi", "Okafor", "Data Science", "DevOps Engineer"),
+    ("head.fin", "Bola", "Adeyemi", "Accounting", "Head of Accounting"),
+    ("staff4", "Kemi", "Lawal", "Accounting", "Accountant"),
+    ("staff5", "Emeka", "Eze", "Banking and Finance", "Payroll Officer"),
+    ("head.ops", "Yusuf", "Danjuma", "Works", "Head of Works"),
+    ("staff6", "Funke", "Adebayo", "Admin", "Logistics Officer"),
+    ("staff7", "Segun", "Balogun", "Bursary", "Facilities Officer"),
     ("hr", "Ngozi", "Eze", "Human Resources", "HR Manager"),
 ]
 
@@ -46,44 +75,64 @@ class Command(BaseCommand):
     def handle(self, *args, with_requests=False, **opts):
         today = timezone.localdate()
         year = today.year
+
+        # 1. Create Leave Types
         for name, days, doc, paid, carry, notice, maxc, ign in LEAVE_TYPES:
             LeaveType.objects.get_or_create(name=name, defaults=dict(
                 default_days=days, requires_document=doc, is_paid=paid, carry_over_cap=carry,
                 min_notice_days=notice, max_consecutive_days=maxc, ignore_blackouts=ign))
+
+        # 2. Create Holidays
         for y in (year, year + 1):
             for (m, d), name in HOLIDAYS.items():
                 Holiday.objects.get_or_create(date=dt.date(y, m, d), defaults={"name": name})
 
-        depts = {n: Department.objects.get_or_create(name=n)[0] for n in ("Engineering", "Finance", "Operations", "Human Resources")}
+        # 3. Create ALL Departments (matching the frontend exactly)
+        depts = {}
+        for name in ACADEMIC_DEPTS:
+            d, _ = Department.objects.get_or_create(name=name, defaults={"unit": "academic"})
+            depts[name] = d
+        for name in NON_ACADEMIC_DEPTS:
+            d, _ = Department.objects.get_or_create(name=name, defaults={"unit": "non_academic"})
+            depts[name] = d
+
+        # 4. Create Demo Users
         users = {}
-        for username, first, last, dept, title in USERS:
+        for username, first, last, dept_name, title in USERS:
             u, created = User.objects.get_or_create(username=username, defaults=dict(
-                first_name=first, last_name=last, email=f"{username}@example.com", department=depts[dept],
+                first_name=first, last_name=last, email=f"{username}@example.com", department=depts[dept_name],
                 job_title=title, must_change_password=False, email_verified=True))
             if created:
                 u.set_password(PASSWORD)
                 u.save()
             users[username] = u
-        for dept, head in (("Engineering", "head.eng"), ("Finance", "head.fin"), ("Operations", "head.ops"), ("Human Resources", "hr")):
-            depts[dept].head = users[head]
-            depts[dept].save()
+
+        # Assign HODs to their departments
+        for dept_name, head in (("Computer Science", "head.eng"), ("Accounting", "head.fin"), ("Works", "head.ops"), ("Human Resources", "hr")):
+            depts[dept_name].head = users[head]
+            depts[dept_name].save()
+
+        # Assign Roles
         users["hr"].groups.add(Group.objects.get(name=Roles.HR_MANAGER))
+        
         admin, created = User.objects.get_or_create(username="admin", defaults=dict(
             first_name="System", last_name="Admin", email="admin@example.com", must_change_password=False, is_staff=True, email_verified=True))
         if created:
             admin.set_password(PASSWORD)
             admin.save()
         admin.groups.add(Group.objects.get(name=Roles.ADMIN))
+
+        # Create a Blackout period
         BlackoutPeriod.objects.get_or_create(
             name="Year-end financial close", start_date=dt.date(year, 12, 14), end_date=dt.date(year, 12, 31),
-            defaults=dict(department=depts["Finance"], reason="Finance team is needed for year-end reporting"))
+            defaults=dict(department=depts["Accounting"], reason="Finance team is needed for year-end reporting"))
 
         if with_requests:
             self.sample_requests(users, today)
+
         self.stdout.write(self.style.SUCCESS(
             f"Demo data ready. Logins (password {PASSWORD}): staff1..staff7, head.eng, head.fin, head.ops, hr, admin"))
 
-    # ------------------------------------------------------------------
     def sample_requests(self, users, today):
         if LeaveRequest.objects.exists():
             self.stdout.write("Requests already exist; skipping samples.")
@@ -153,13 +202,13 @@ class Command(BaseCommand):
         def apply(user, start, end, lt=annual, reason="", part="full"):
             try:
                 return services.submit_leave(user=user, leave_type=lt, start_date=start, end_date=end, reason=reason, day_part=part)
-            except Exception as exc:  # demo data must never break the seed
+            except Exception as exc:
                 self.stdout.write(f"  skipped sample request for {user.username}: {exc}")
 
-        r1 = apply(users["staff1"], monday, monday + dt.timedelta(days=4), reason="Family trip to Abuja")
+        r1 = apply(users["staff1"], monday, monday + dt.timedelta(days=4), reason="Family trip")
         if r1:
             services.approve(r1, users["head.eng"], "Enjoy! Handover notes please.")
-        apply(users["staff2"], monday + dt.timedelta(days=7), monday + dt.timedelta(days=11), reason="Wedding in Enugu")
+        apply(users["staff2"], monday + dt.timedelta(days=7), monday + dt.timedelta(days=11), reason="Wedding")
         apply(users["staff3"], monday + dt.timedelta(days=9), monday + dt.timedelta(days=11), reason="Moving house")
         apply(users["staff5"], monday + dt.timedelta(days=14), monday + dt.timedelta(days=14), reason="Dentist", part="morning")
         r4 = apply(users["staff4"], monday + dt.timedelta(days=2), monday + dt.timedelta(days=6), reason="Short break")
